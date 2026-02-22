@@ -14,8 +14,9 @@ class TransakcjaParser(BaseParser):
         dokument_fk, 
         cena_transakcji_brutto,
         data_wpisu,
-        raw_xml
-    ) VALUES (?, ?, ?, ?, ?, ?);
+        raw_xml,
+        import_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?);
     """
 
     def ensure_schema(self, conn: sqlite3.Connection) -> None:
@@ -27,11 +28,13 @@ class TransakcjaParser(BaseParser):
           dokument_fk       TEXT,
           cena_transakcji_brutto NUMERIC,
           data_wpisu        DATE,
-          raw_xml           TEXT
+          raw_xml           TEXT,
+          import_id         INTEGER REFERENCES _import_meta(id)
         );
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tx_nier ON raw_transakcja(nieruchomosc_fk);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tx_doc  ON raw_transakcja(dokument_fk);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tx_import ON raw_transakcja(import_id);")
 
     def parse(self, feature_elem: ET.Element) -> tuple | None:
         """

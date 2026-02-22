@@ -19,8 +19,9 @@ class LokalParser(BaseParser):
         cena_lokalu_brutto,
         adres_budynku_z_lokalem_fk,
         data_wpisu,
-        raw_xml
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        raw_xml,
+        import_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
     def ensure_schema(self, conn: sqlite3.Connection) -> None:
@@ -37,12 +38,14 @@ class LokalParser(BaseParser):
           cena_lokalu_brutto          NUMERIC,
           adres_budynku_z_lokalem_fk  TEXT,
           data_wpisu                  DATE,
-          raw_xml                     TEXT
+          raw_xml                     TEXT,
+          import_id                   INTEGER REFERENCES _import_meta(id)
         );
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lok_adres ON raw_lokal(adres_budynku_z_lokalem_fk);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lok_id ON raw_lokal(id_lokalu);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lok_numer ON raw_lokal(numer_lokalu);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_lok_import ON raw_lokal(import_id);")
 
     def _extract_numer_lokalu(self, id_lokalu: str | None) -> str | None:
         """
@@ -90,7 +93,7 @@ class LokalParser(BaseParser):
         funkcja_lokalu = self._find_first_text(feature_elem, "funkcjaLokalu", required=False)
         liczba_izb = self._find_first_text(feature_elem, "liczbaIzb", required=False)
         nr_kondygnacji = self._find_first_text(feature_elem, "nrKondygnacji", required=False)
-        pow_uzytkowo = self._find_first_text(feature_elem, "powUzytkowaLokalu")
+        pow_uzytkowo = self._find_first_text(feature_elem, "powUzytkowaLokalu", required=False)
         cena_brutto = self._find_first_text(feature_elem, "cenaLokaluBrutto", required=False)
         adres_fk = self._href_to_id(self._find_first_href(feature_elem, "adresBudynkuZLokalem", required=False), "adresBudynkuZLokalem")
         data_wpisu = self._extract_date_from_gml_id(fid)

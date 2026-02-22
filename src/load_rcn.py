@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 import argparse
 import logging
+import os
 import sqlite3
 import time
 import xml.etree.ElementTree as ET
 
 from src.logging_config import setup_logging
 from src.utils import local
+from src.import_meta import ensure_import_meta_schema, start_import, complete_import, fail_import, is_file_imported, find_suspected_duplicate
 from src.parsers.transakcja import TransakcjaParser
 from src.parsers.lokal import LokalParser
 from src.parsers.dokument import DokumentParser
@@ -88,7 +90,7 @@ def count_features(gml_path: str) -> int:
     return count
 
 
-def load_rcn(gml_path: str, db_path: str, batch_size: int = 100000, log_every: int = 500000) -> dict:
+def load_rcn(gml_path: str, db_path: str, batch_size: int = 100000, log_every: int = 500000, force: bool = False) -> dict:
     """
     Load RCN GML file into SQLite database.
 
@@ -97,6 +99,7 @@ def load_rcn(gml_path: str, db_path: str, batch_size: int = 100000, log_every: i
         db_path: Path to the SQLite database
         batch_size: Batch size for inserts
         log_every: Log progress every N features
+        force: Force re-import even if file was already imported
 
     Returns:
         dict with statistics: processed, inserted, by_type, elapsed
@@ -118,9 +121,35 @@ def load_rcn(gml_path: str, db_path: str, batch_size: int = 100000, log_every: i
 
     conn = sqlite3.connect(db_path)
 
+    # Create import metadata table
+    ensure_import_meta_schema(conn)
+
+    # Check 1: Exact match by filename
+    existing_import = is_file_imported(conn, gml_path)
+    if not force and existing_import:
+        size_mb = existing_import.get('file_size', 0) / 1_000_000
+        records = existing_import.get('records_inserted', 0)
+        logger.warning(f"File '{os.path.basename(gml_path)}' was already imported (size: {size_mb:.1f}MB, records: {records}). Use --force to re-import.")
+        conn.close()
+        return {"skipped": True, "reason": "already_imported"}
+
+    # Check 2: Suspected duplicate (same size, different name)
+    suspected = find_suspected_duplicate(conn, gml_path)
+    if not force and suspected:
+        size_mb = suspected.get('file_size', 0) / 1_000_000
+        records = suspected.get('records_inserted', 0)
+        other_file = suspected.get('source_file', '?')
+        logger.warning(f"Suspected duplicate: file '{os.path.basename(gml_path)}' has same size ({size_mb:.1f}MB) as already imported '{other_file}' ({records} records). Use --force to import anyway.")
+        conn.close()
+        return {"skipped": True, "reason": "suspected_duplicate", "similar_to": other_file}
+
     for p in PARSERS.values():
         p.ensure_schema(conn)
     conn.commit()
+
+    # Start import - get import_id
+    import_id = start_import(conn, gml_path)
+    logger.info(f"Started import with id={import_id}")
 
     buffers = {ft: [] for ft in PARSERS.keys()}
     processed = 0
@@ -161,7 +190,9 @@ def load_rcn(gml_path: str, db_path: str, batch_size: int = 100000, log_every: i
 
             row = p.parse(feature)
             if row is not None:
-                buffers[ftype].append(row)
+                # Add import_id to each row
+                row_with_import = row + (import_id,)
+                buffers[ftype].append(row_with_import)
 
             if any(len(b) >= batch_size for b in buffers.values()):
                 flush()
@@ -181,6 +212,11 @@ def load_rcn(gml_path: str, db_path: str, batch_size: int = 100000, log_every: i
             logger.info(f"  {k}: {inserted_by_type[k]}")
 
         elapsed = time.time() - start
+
+        # Complete import
+        complete_import(conn, import_id, inserted, elapsed)
+        logger.info(f"Import completed: id={import_id}, records={inserted}, time={elapsed:.0f}s")
+
         logger.info(f"Done. processed={processed}, inserted={inserted}, db={db_path}, time={elapsed:.0f}s")
 
         return {
@@ -189,7 +225,13 @@ def load_rcn(gml_path: str, db_path: str, batch_size: int = 100000, log_every: i
             "seen_by_type": seen_by_type,
             "inserted_by_type": inserted_by_type,
             "elapsed": elapsed,
+            "import_id": import_id,
         }
+    except Exception as e:
+        # Mark import as failed
+        fail_import(conn, import_id)
+        logger.error(f"Import failed: id={import_id}, error={e}")
+        raise
     finally:
         conn.close()
 

@@ -18,8 +18,9 @@ class NieruchomoscParser(BaseParser):
         budynek_fk,
         lokal_fk,
         data_wpisu,
-        raw_xml
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        raw_xml,
+        import_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
     def ensure_schema(self, conn: sqlite3.Connection) -> None:
@@ -35,12 +36,14 @@ class NieruchomoscParser(BaseParser):
           budynek_fk                          TEXT,
           lokal_fk                            TEXT,
           data_wpisu                          DATE,
-          raw_xml                             TEXT
+          raw_xml                             TEXT,
+          import_id                           INTEGER REFERENCES _import_meta(id)
         );
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_nier_dzialka ON raw_nieruchomosc(dzialka_fk);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_nier_budynek ON raw_nieruchomosc(budynek_fk);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_nier_lokal ON raw_nieruchomosc(lokal_fk);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_nier_import ON raw_nieruchomosc(import_id);")
 
     def parse(self, feature_elem: ET.Element) -> tuple | None:
         """
@@ -58,6 +61,7 @@ class NieruchomoscParser(BaseParser):
         udzial = self._find_first_text(feature_elem, "udzialWPrawieDoNieruchomosci", required=False)
         cena_brutto = self._find_first_text(feature_elem, "cenaNieruchomosciBrutto", required=False)
 
+        # TODO: Nieruchomosc can have multiple dzialka (don't know yet about budynek/lokal links yet). We should probably store them in separate tables instead of just taking the first one.
         dzialka_fk = self._href_to_id(self._find_first_href(feature_elem, "dzialka", required=False), "dzialka")
         budynek_fk = self._href_to_id(self._find_first_href(feature_elem, "budynek", required=False), "budynek")
         lokal_fk = self._href_to_id(self._find_first_href(feature_elem, "lokal", required=False), "lokal")
@@ -68,4 +72,5 @@ class NieruchomoscParser(BaseParser):
 
         return (fid, rodzaj_nier, rodzaj_prawa, udzial, cena_brutto,
                 dzialka_fk, budynek_fk, lokal_fk, data_wpisu, raw_xml)
+
 

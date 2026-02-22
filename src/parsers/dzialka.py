@@ -15,8 +15,9 @@ class DzialkaParser(BaseParser):
         sposob_uzytkowania,
         adres_dzialki_fk,
         data_wpisu,
-        raw_xml
-    ) VALUES (?, ?, ?, ?, ?, ?, ?);
+        raw_xml,
+        import_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
     """
 
     def ensure_schema(self, conn: sqlite3.Connection) -> None:
@@ -29,11 +30,13 @@ class DzialkaParser(BaseParser):
           sposob_uzytkowania              TEXT,
           adres_dzialki_fk                TEXT,
           data_wpisu                      DATE,
-          raw_xml                         TEXT
+          raw_xml                         TEXT,
+          import_id                       INTEGER REFERENCES _import_meta(id)
         );
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_dzi_adres ON raw_dzialka(adres_dzialki_fk);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_dzi_id ON raw_dzialka(id_dzialki);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_dzi_import ON raw_dzialka(import_id);")
 
     def parse(self, feature_elem: ET.Element) -> tuple | None:
         """
@@ -45,7 +48,7 @@ class DzialkaParser(BaseParser):
             logger.error("missing gml:id for dzialka, skipping.")
             return None
 
-        id_dzialki = self._find_first_text(feature_elem, "idDzialki")
+        id_dzialki = self._find_first_text(feature_elem, "idDzialki", required=False)
         pole_pow = self._find_first_text(feature_elem, "polePowierzchniEwidencyjnej", required=False)
         sposob_uzytkowania = self._find_first_text(feature_elem, "sposobUzytkowania", required=False)
         adres_fk = self._href_to_id(self._find_first_href(feature_elem, "adresDzialki", required=False), "adresDzialki")

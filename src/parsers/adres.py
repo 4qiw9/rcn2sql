@@ -14,8 +14,9 @@ class AdresParser(BaseParser):
         ulica,
         numer_porzadkowy,
         data_wpisu,
-        raw_xml
-    ) VALUES (?, ?, ?, ?, ?, ?);
+        raw_xml,
+        import_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?);
     """
 
     def ensure_schema(self, conn: sqlite3.Connection) -> None:
@@ -27,11 +28,13 @@ class AdresParser(BaseParser):
           ulica               TEXT,
           numer_porzadkowy    TEXT,
           data_wpisu          DATE,
-          raw_xml             TEXT
+          raw_xml             TEXT,
+          import_id           INTEGER REFERENCES _import_meta(id)
         );
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_adr_miejscowosc ON raw_adres(miejscowosc);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_adr_ulica ON raw_adres(ulica);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_adr_import ON raw_adres(import_id);")
 
     def parse(self, feature_elem: ET.Element) -> tuple | None:
         """

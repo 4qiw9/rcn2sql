@@ -12,6 +12,7 @@ __pycache__/
 venv/
 env/
 log/
+gmls/
 *.egg-info/
 dist/
 build/

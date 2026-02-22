@@ -14,8 +14,9 @@ class DokumentParser(BaseParser):
         data_sporzadzenia_dokumentu,
         tworca_dokumentu,
         data_wpisu,
-        raw_xml
-    ) VALUES (?, ?, ?, ?, ?, ?);
+        raw_xml,
+        import_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?);
     """
 
     def ensure_schema(self, conn: sqlite3.Connection) -> None:
@@ -27,11 +28,13 @@ class DokumentParser(BaseParser):
           data_sporzadzenia_dokumentu     DATE,
           tworca_dokumentu                TEXT,
           data_wpisu                      DATE,
-          raw_xml                         TEXT
+          raw_xml                         TEXT,
+          import_id                       INTEGER REFERENCES _import_meta(id)
         );
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_dok_oznaczenie ON raw_dokument(oznaczenie_dokumentu);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_dok_data ON raw_dokument(data_sporzadzenia_dokumentu);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_dok_import ON raw_dokument(import_id);")
 
     def parse(self, feature_elem: ET.Element) -> tuple | None:
         """

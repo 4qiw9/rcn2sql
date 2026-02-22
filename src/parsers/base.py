@@ -127,7 +127,7 @@ class BaseParser(ABC):
     def _extract_date_from_gml_id(self, fid: str) -> str | None:
         """
         Extract date from gml:id.
-        Returns ISO date string 'YYYY-MM-DD' or None.
+        Returns ISO date string 'YYYY-MM-DD' or None if not found.
         """
         try:
             tail = fid.rsplit("_", 1)[1]
@@ -135,5 +135,5 @@ class BaseParser(ABC):
             date.fromisoformat(d)
             return d
         except (IndexError, ValueError):
-            logger.error(f"missing/invalid timestamp in gml:id: {fid}, skipping")
+            # Date is optional - some GML files don't have timestamp in gml:id
             return None
