@@ -16,6 +16,7 @@ def build_select_sql(limit: int | None) -> str:
         tx.dokument_fk,
         tx.cena_transakcji_brutto,
         tx.data_wpisu AS transakcja_data_wpisu,
+        tx.import_id,
 
         nier.id AS nieruchomosc_id,
         nier.rodzaj_nieruchomosci,
@@ -66,9 +67,12 @@ def build_select_sql(limit: int | None) -> str:
     FROM raw_transakcja tx
     LEFT JOIN raw_nieruchomosc nier ON tx.nieruchomosc_fk = nier.id
     LEFT JOIN raw_dokument dok ON tx.dokument_fk = dok.id
-    LEFT JOIN raw_dzialka dzi ON nier.dzialka_fk = dzi.id
-    LEFT JOIN raw_budynek bud ON nier.budynek_fk = bud.id
-    LEFT JOIN raw_lokal lok ON nier.lokal_fk = lok.id
+    LEFT JOIN raw_nieruchomosc_dzialka nd ON nier.id = nd.nieruchomosc_id
+    LEFT JOIN raw_dzialka dzi ON nd.dzialka_id = dzi.id
+    LEFT JOIN raw_nieruchomosc_budynek nb ON nier.id = nb.nieruchomosc_id
+    LEFT JOIN raw_budynek bud ON nb.budynek_id = bud.id
+    LEFT JOIN raw_nieruchomosc_lokal nl ON nier.id = nl.nieruchomosc_id
+    LEFT JOIN raw_lokal lok ON nl.lokal_id = lok.id
     LEFT JOIN raw_adres adr_dzi ON dzi.adres_dzialki_fk = adr_dzi.id
     LEFT JOIN raw_adres adr_bud ON bud.adres_budynku_fk = adr_bud.id
     LEFT JOIN raw_adres adr_lok ON lok.adres_budynku_z_lokalem_fk = adr_lok.id
@@ -85,6 +89,7 @@ def create_indexes(conn: sqlite3.Connection, table: str) -> None:
     conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_dzialka_id ON {table}(dzialka_id);")
     conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_budynek_id ON {table}(budynek_id);")
     conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_lokal_id ON {table}(lokal_id);")
+    conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_import_id ON {table}(import_id);")
 
 
 def build_wide(db_path: str, table: str = "rcn_wide", limit: int | None = None,
