@@ -1,0 +1,21 @@
+[project]
+name = "rcn2sql"
+version = "0.1.0"
+description = "Convert RCN GML files to SQLite database"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "4qiw9"}
+]
+keywords = ["rcn", "gml", "sqlite", "geodata"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+rcn2sql = "cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
